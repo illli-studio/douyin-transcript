@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-radius="soft" data-buttons="solid">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>文案提取器：本机抖音口播转文字</title>
+  <meta name="description" content="把一条抖音分享链接转成本机文字。下载音频后用 SenseVoiceSmall 识别，不需要云端语音密钥。">
+  <meta name="theme-color" content="#18191b">
+  <meta property="og:title" content="文案提取器">
+  <meta property="og:description" content="本机把抖音口播转成文字。">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --p-bg: #18191b; --p-surface: #222427; --p-ink: #eff0f1; --p-muted: #9c9ea3;
+      --p-action: #ff4a1f; --p-action-ink: #18191b;
+      --font-display: "Geist", "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+      --font-text: "Geist", "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+      --font-mono: "Geist Mono", ui-monospace, Menlo, Consolas, monospace;
+      --nav: 72px; --gut: 80px; --padt: 72px; --padb: 72px;
+      --r-md: 12px; --r-lg: 20px; --r-btn: 8px;
+      --line: color-mix(in srgb, var(--p-ink) 14%, transparent);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body { background: var(--p-bg); color: var(--p-ink); font: 400 16px/1.6 var(--font-text); -webkit-font-smoothing: antialiased; }
+    button, textarea { font: inherit; color: inherit; }
+    .skip-link { position: absolute; left: 16px; top: -48px; z-index: 20; background: var(--p-action); color: var(--p-action-ink); padding: 8px 16px; border-radius: var(--r-btn); text-decoration: none; }
+    .skip-link:focus { top: 12px; }
+    .wrap { width: min(100% - 2 * var(--gut), 1120px); margin: 0 auto; }
+    header.nav { position: fixed; inset: 0 0 auto 0; height: var(--nav); z-index: 10; background: var(--p-bg); border-bottom: 1px solid var(--line); }
+    header.nav .wrap { height: 100%; display: flex; align-items: center; justify-content: space-between; }
+    .brand { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; }
+    .mark { width: 28px; height: 28px; border-radius: 8px; background: var(--p-action); color: var(--p-action-ink); display: grid; place-items: center; font: 500 14px/1 var(--font-display); }
+    .brand strong { font: 500 18px/1 var(--font-display); letter-spacing: -0.035em; }
+    .nav__meta { color: var(--p-muted); font-size: 14px; }
+    .dot { width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #3dcf8e; display: inline-block; }
+    main { padding-top: var(--nav); }
+    .hero { padding: var(--padt) 0 32px; }
+    h1 { margin: 0; max-width: 12ch; font: 500 clamp(40px, 5vw, 64px)/1.05 var(--font-display); letter-spacing: -0.045em; }
+    .lead { max-width: 40rem; margin: 20px 0 0; color: var(--p-muted); font-size: 18px; }
+    .facts { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 28px 0 0; padding: 0; list-style: none; color: var(--p-muted); font-size: 14px; }
+    .facts strong { color: var(--p-ink); font-weight: 500; }
+    .tool { padding-bottom: var(--padb); }
+    .panel { background: var(--p-surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 24px; }
+    label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 500; }
+    textarea { width: 100%; background: var(--p-bg); border: 1px solid var(--line); border-radius: var(--r-md); }
+    #share { min-height: 112px; padding: 14px 16px; resize: vertical; }
+    textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--p-action); outline-offset: 3px; }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 16px; }
+    .hint { margin: 0; color: var(--p-muted); font-size: 14px; }
+    .btn { height: 48px; padding: 0 20px; border: 0; border-radius: var(--r-btn); cursor: pointer; background: var(--p-action); color: var(--p-action-ink); font-weight: 500; }
+    .btn:disabled { opacity: 0.55; cursor: progress; }
+    .btn--ghost { background: transparent; color: var(--p-ink); border: 1px solid var(--line); }
+    .btn--small { height: 40px; font-size: 14px; }
+    .status { min-height: 24px; margin: 12px 0 0; font-size: 14px; }
+    .status.is-error { color: #ff8a73; }
+    .result { margin-top: 24px; }
+    .result__head, .actions { display: flex; gap: 12px; align-items: flex-start; }
+    .result__head { justify-content: space-between; }
+    h2 { margin: 0; font: 500 28px/1.25 var(--font-display); letter-spacing: -0.035em; }
+    .meta { margin: 8px 0 0; color: var(--p-muted); font: 13px/1.4 var(--font-mono); word-break: break-all; }
+    #text { min-height: 280px; margin-top: 24px; padding: 16px; line-height: 1.7; resize: vertical; }
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin: 48px 0 0; padding: 0; list-style: none; }
+    .steps li { padding-top: 16px; border-top: 1px solid var(--line); }
+    .steps span { display: block; margin-bottom: 12px; color: var(--p-muted); font: 500 13px/1 var(--font-mono); }
+    .steps strong { display: block; margin-bottom: 8px; font-weight: 500; }
+    .steps p { margin: 0; color: var(--p-muted); font-size: 14px; }
+    footer.closing { border-top: 1px solid var(--line); padding: 32px 0; color: var(--p-muted); font-size: 14px; }
+    footer .wrap { display: flex; justify-content: space-between; gap: 16px; }
+    footer a { color: var(--p-ink); }
+    @media (max-width: 820px) {
+      :root { --gut: 24px; --nav: 64px; --padt: 40px; }
+      .row, .result__head, .actions, footer .wrap, .steps { display: block; }
+      .btn { width: 100%; margin-top: 12px; }
+      .steps li + li { margin-top: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap">
+      <a class="skip-link" href="#share">跳到输入框</a>
+      <a class="brand" href="#top"><span class="mark">文</span><strong>文案提取器</strong></a>
+      <p class="nav__meta"><span class="dot" aria-hidden="true"></span>本机模型已连接</p>
+    </div>
+  </header>
+  <main id="top">
+    <section class="hero">
+      <div class="wrap">
+        <h1>抖音口播转文字</h1>
+        <p class="lead">贴一条分享文案。本机下载音频，再用 SenseVoiceSmall 转成文字，不需要云端语音密钥。</p>
+        <ul class="facts">
+          <li><strong>127.0.0.1:18088</strong> 只在这台电脑上</li>
+          <li><strong>SenseVoiceSmall</strong> 本机识别</li>
+          <li>一条链接，一份文案</li>
+        </ul>
+      </div>
+    </section>
+    <section class="tool">
+      <div class="wrap">
+        <form class="panel" id="extract-form">
+          <label for="share">分享文案</label>
+          <textarea id="share" required placeholder="粘贴整段分享，或只贴 https://v.douyin.com/……"></textarea>
+          <div class="row">
+            <p class="hint">识别通常要一两分钟。</p>
+            <button class="btn" id="submit" type="submit">提取文案</button>
+          </div>
+          <p class="status" id="status" role="status"></p>
+        </form>
+        <article class="panel result" id="result" hidden>
+          <div class="result__head">
+            <div>
+              <h2 id="title">文案</h2>
+              <p class="meta" id="video-id"></p>
+            </div>
+            <div class="actions">
+              <button class="btn btn--ghost btn--small" id="copy" type="button">复制文案</button>
+              <button class="btn btn--ghost btn--small" id="save" type="button">下载 Markdown</button>
+            </div>
+          </div>
+          <textarea id="text" readonly aria-label="识别出的文案"></textarea>
+        </article>
+        <ol class="steps">
+          <li><span>01</span><strong>解析链接</strong><p>从分享文案里取出视频编号。</p></li>
+          <li><span>02</span><strong>下载音频</strong><p>只取音频，不把整段视频存下来。</p></li>
+          <li><span>03</span><strong>本机识别</strong><p>SenseVoiceSmall 在这台电脑上转写。</p></li>
+        </ol>
+      </div>
+    </section>
+  </main>
+  <footer class="closing">
+    <div class="wrap"><span>文案提取器 · 2026</span><a href="https://github.com/yzfly/douyin-mcp-server">上游项目</a></div>
+  </footer>
+  <script>
+    const form = document.getElementById('extract-form');
+    const share = document.getElementById('share');
+    const submit = document.getElementById('submit');
+    const statusEl = document.getElementById('status');
+    const result = document.getElementById('result');
+    const titleEl = document.getElementById('title');
+    const idEl = document.getElementById('video-id');
+    const textEl = document.getElementById('text');
+    let current = null;
+    function setStatus(message, isError) {
+      statusEl.textContent = message;
+      statusEl.classList.toggle('is-error', Boolean(isError));
+    }
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const found = share.value.match(/https?:\/\/[^\s]+/);
+      if (!found) { setStatus('这段文字里没有链接。', true); return; }
+      submit.disabled = true; result.hidden = true; current = null;
+      setStatus('正在下载音频并识别，请等一两分钟。', false);
+      try {
+        const response = await fetch('/api/video/extract', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: found[0] })
+        });
+        const data = await response.json();
+        if (!data.success) { setStatus(data.error || '提取失败', true); return; }
+        current = data;
+        titleEl.textContent = data.title || '未返回标题';
+        idEl.textContent = data.video_id ? '视频 ' + data.video_id : '';
+        textEl.value = data.text || '';
+        result.hidden = false;
+        setStatus('文案已提取。', false);
+      } catch (error) {
+        setStatus('这台电脑上的服务没有响应。', true);
+      } finally { submit.disabled = false; }
+    });
+    document.getElementById('copy').addEventListener('click', async () => {
+      if (!textEl.value) return;
+      try { await navigator.clipboard.writeText(textEl.value); setStatus('文案已复制。', false); }
+      catch (error) { textEl.focus(); textEl.select(); setStatus('复制失败，文案已选中。', true); }
+    });
+    document.getElementById('save').addEventListener('click', () => {
+      if (!current) return;
+      const blob = new Blob(['# ' + (current.title || '视频文案') + '\n\n视频ID: ' + (current.video_id || '') + '\n\n---\n\n' + (current.text || '')], { type: 'text/markdown;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = (current.video_id || 'transcript') + '.md';
+      link.click(); URL.revokeObjectURL(link.href);
+    });
+  </script>
+</body>
+</html>
